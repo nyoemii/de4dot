@@ -78,7 +78,7 @@ namespace de4dot.code.renamer {
 					newNamespace = "";
 				Rename("<Module>");
 			}
-			else if (!checker.IsValidTypeName(oldName)) {
+			else if (!checker.IsValidTypeName(oldName) && !renamed) {
 				if (origClassName != null && checker.IsValidTypeName(origClassName))
 					Rename(state.GetTypeName(oldName, origClassName));
 				else {
