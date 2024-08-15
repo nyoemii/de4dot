@@ -478,7 +478,8 @@ namespace de4dot.code.renamer {
 					if (fieldInfo.renamed)
 						continue;
 
-					var parameterName = methodDef.MethodDef.Parameters[paramIndex].Name;
+					var paramInfo = memberInfos.Param(methodDef.ParamDefs[paramIndex]);
+					var parameterName = paramInfo.newName;
 					if (!checker.IsValidFieldName(parameterName))
 						continue;
 					fieldInfo.suggestedName = parameterName;
