@@ -324,7 +324,44 @@ namespace de4dot.code {
 			return list;
 		}
 
+		private List<MethodDef> inlineCandidate;
 		public void DeobfuscateBegin() {
+			inlineCandidate = new();
+			foreach (var m in GetAllMethods().Where(_ => _.HasBody && _.Body.HasInstructions)) {
+				if (m.IsStatic && m.Parameters.Count + 2 == m.Body.Instructions.Count) {
+					var callInstruction = m.Body.Instructions[m.Parameters.Count];
+					if (callInstruction.OpCode == OpCodes.Call || callInstruction.OpCode == OpCodes.Callvirt) {
+						bool isValidInlineTarget = true;
+						for (int i = 0; i < m.Parameters.Count; i++) {
+							var ldarg = m.Body.Instructions[i];
+							if ((i == 0 && ldarg.OpCode != OpCodes.Ldarg_0)) {
+								isValidInlineTarget = false;
+								break;
+							}
+							if ((i == 1 && ldarg.OpCode != OpCodes.Ldarg_1)) {
+								isValidInlineTarget = false;
+								break;
+							}
+							if ((i == 2 && ldarg.OpCode != OpCodes.Ldarg_2)) {
+								isValidInlineTarget = false;
+								break;
+							}
+							if ((i == 3 && ldarg.OpCode != OpCodes.Ldarg_3)) {
+								isValidInlineTarget = false;
+								break;
+							}
+							if (i > 3 && !(ldarg.OpCode == OpCodes.Ldarg && i == (int)ldarg.Operand)) {
+								isValidInlineTarget = false;
+								break;
+							}
+						}
+
+						if (isValidInlineTarget) {
+							inlineCandidate.Add(m);
+						}
+					}					
+				}
+			}
 			switch (options.StringDecrypterType) {
 			case DecrypterType.None:
 				CheckSupportedStringDecrypter(StringFeatures.AllowNoDecryption);
@@ -516,7 +553,13 @@ namespace de4dot.code {
 				name = null;
 		}
 
-		public void DeobfuscateEnd() => DeobfuscateCleanUp();
+		public void DeobfuscateEnd() {
+			foreach (var m in inlineCandidate) {
+				m.DeclaringType.Remove(m);
+			}
+
+			DeobfuscateCleanUp();
+		}
 
 		public void DeobfuscateCleanUp() {
 			if (assemblyClient != null) {
@@ -600,6 +643,20 @@ namespace de4dot.code {
 			int oldNumInstructions = method.Body.Instructions.Count;
 
 			deob.DeobfuscateMethodBegin(blocks);
+			foreach (var block in blocks.MethodBlocks.GetAllBlocks()) {
+				for (var i = 0; i < block.Instructions.Count; i++) {
+					var instr = block.Instructions[i];
+					if (instr.OpCode == OpCodes.Call) {
+						var targetMethod = (IMethod)instr.Operand;
+						var inlineIndex = inlineCandidate.Find(ic => ic.FullName == targetMethod.FullName);
+						if (inlineIndex != null) {
+							var newInstr = new Instr(instr.Instruction.Clone());
+							newInstr.Operand = inlineIndex.Body.Instructions[inlineIndex.Parameters.Count].Operand;
+							block.Instructions[i] = newInstr;	
+						}
+					}
+				}
+			}
 			if (options.ControlFlowDeobfuscation) {
 				cflowDeobfuscator.Initialize(blocks);
 				cflowDeobfuscator.Deobfuscate();
