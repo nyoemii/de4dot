@@ -5,6 +5,11 @@ de4dot is an open source (GPLv3) .NET deobfuscator and unpacker written in C#. I
 
 It uses [dnlib](https://github.com/0xd4d/dnlib/) to read and write assemblies so make sure you get it or it won't compile.
 
+Docs
+====
+
+There [list of techniques](./docs) which I would like to describe.
+
 Binaries
 ========
 
