@@ -324,7 +324,7 @@ namespace de4dot.code {
 			return list;
 		}
 
-		private List<MethodDef> inlineCandidate;
+		private Dictionary<string, MethodDef> inlineCandidate;
 		public void DeobfuscateBegin() {
 			inlineCandidate = new();
 			foreach (var m in GetAllMethods().Where(_ => _.HasBody && _.Body.HasInstructions)) {
@@ -357,7 +357,7 @@ namespace de4dot.code {
 						}
 
 						if (isValidInlineTarget) {
-							inlineCandidate.Add(m);
+							inlineCandidate.Add(m.FullName, m);
 						}
 					}					
 				}
@@ -555,7 +555,7 @@ namespace de4dot.code {
 
 		public void DeobfuscateEnd() {
 			foreach (var m in inlineCandidate) {
-				m.DeclaringType.Remove(m);
+				m.Value.DeclaringType.Remove(m.Value);
 			}
 
 			DeobfuscateCleanUp();
@@ -637,26 +637,24 @@ namespace de4dot.code {
 			if (!HasNonEmptyBody(method))
 				return;
 
+			for (var i = 0; i < method.Body.Instructions.Count; i++) {
+				var instr = method.Body.Instructions[i];
+				if (instr.OpCode == OpCodes.Call) {
+					var targetMethod = (IMethod)instr.Operand;
+					if (inlineCandidate.TryGetValue(targetMethod.ResolveMethodDef()?.FullName ?? targetMethod.FullName, out var methodToInline)) {
+						var newInstr = instr.Clone();
+						newInstr.Operand = methodToInline.Body.Instructions[methodToInline.Parameters.Count].Operand;
+						method.Body.Instructions[i] = newInstr;
+					}
+				}
+			}
+
 			var blocks = new Blocks(method);
 
 			int numRemovedLocals = 0;
 			int oldNumInstructions = method.Body.Instructions.Count;
 
 			deob.DeobfuscateMethodBegin(blocks);
-			foreach (var block in blocks.MethodBlocks.GetAllBlocks()) {
-				for (var i = 0; i < block.Instructions.Count; i++) {
-					var instr = block.Instructions[i];
-					if (instr.OpCode == OpCodes.Call) {
-						var targetMethod = (IMethod)instr.Operand;
-						var inlineIndex = inlineCandidate.Find(ic => ic.FullName == targetMethod.FullName);
-						if (inlineIndex != null) {
-							var newInstr = new Instr(instr.Instruction.Clone());
-							newInstr.Operand = inlineIndex.Body.Instructions[inlineIndex.Parameters.Count].Operand;
-							block.Instructions[i] = newInstr;	
-						}
-					}
-				}
-			}
 			if (options.ControlFlowDeobfuscation) {
 				cflowDeobfuscator.Initialize(blocks);
 				cflowDeobfuscator.Deobfuscate();
