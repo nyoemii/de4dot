@@ -3,7 +3,7 @@
 Some obfuscators replace methods calls, accessing fields, expressions by proxy functions. for example, all call to `String::Combine` replaced to calls to this method.
 
 Let's take original code
-```
+```cil
 .method public static string  test() cil managed
   {
     .maxstack  2
@@ -24,7 +24,7 @@ Let's take original code
 
 For each call seen, we create method proxy like that.
 
-```
+```cil
 .method static privatescope 
         string MethodProxy (
             string '',
