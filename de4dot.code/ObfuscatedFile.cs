@@ -642,9 +642,7 @@ namespace de4dot.code {
 				if (instr.OpCode == OpCodes.Call) {
 					var targetMethod = (IMethod)instr.Operand;
 					if (inlineCandidate.TryGetValue(targetMethod.ResolveMethodDef()?.FullName ?? targetMethod.FullName, out var methodToInline)) {
-						var newInstr = instr.Clone();
-						newInstr.Operand = methodToInline.Body.Instructions[methodToInline.Parameters.Count].Operand;
-						method.Body.Instructions[i] = newInstr;
+						instr.Operand = methodToInline.Body.Instructions[methodToInline.Parameters.Count].Operand;
 					}
 				}
 			}
