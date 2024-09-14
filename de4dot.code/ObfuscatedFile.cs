@@ -330,7 +330,7 @@ namespace de4dot.code {
 			foreach (var m in GetAllMethods().Where(_ => _.HasBody && _.Body.HasInstructions)) {
 				if (m.IsStatic && m.Parameters.Count + 2 == m.Body.Instructions.Count) {
 					var callInstruction = m.Body.Instructions[m.Parameters.Count];
-					if (callInstruction.OpCode == OpCodes.Call || callInstruction.OpCode == OpCodes.Callvirt) {
+					if (callInstruction.OpCode == OpCodes.Call || callInstruction.OpCode == OpCodes.Callvirt || callInstruction.OpCode == OpCodes.Newobj) {
 						bool isValidInlineTarget = true;
 						for (int i = 0; i < m.Parameters.Count; i++) {
 							var ldarg = m.Body.Instructions[i];
@@ -350,7 +350,7 @@ namespace de4dot.code {
 								isValidInlineTarget = false;
 								break;
 							}
-							if (i > 3 && !(ldarg.OpCode == OpCodes.Ldarg && i == (int)ldarg.Operand)) {
+							if (i > 3 && !((ldarg.OpCode == OpCodes.Ldarg && i == (int)ldarg.Operand) || (ldarg.OpCode == OpCodes.Ldarg_S && i == ((dnlib.DotNet.Parameter)ldarg.Operand).Index))) {
 								isValidInlineTarget = false;
 								break;
 							}
@@ -637,14 +637,20 @@ namespace de4dot.code {
 			if (!HasNonEmptyBody(method))
 				return;
 
+			var rewritten = false;
 			for (var i = 0; i < method.Body.Instructions.Count; i++) {
 				var instr = method.Body.Instructions[i];
 				if (instr.OpCode == OpCodes.Call) {
 					var targetMethod = (IMethod)instr.Operand;
 					if (inlineCandidate.TryGetValue(targetMethod.ResolveMethodDef()?.FullName ?? targetMethod.FullName, out var methodToInline)) {
 						instr.Operand = methodToInline.Body.Instructions[methodToInline.Parameters.Count].Operand;
+						rewritten = true;
 					}
 				}
+			}
+
+			if (rewritten) {	
+				method.Body.KeepOldMaxStack = true;
 			}
 
 			var blocks = new Blocks(method);
