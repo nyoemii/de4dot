@@ -641,7 +641,8 @@ namespace de4dot.code {
 			for (var i = 0; i < method.Body.Instructions.Count; i++) {
 				var instr = method.Body.Instructions[i];
 				if (instr.OpCode == OpCodes.Call) {
-					var targetMethod = (IMethod)instr.Operand;
+					var targetMethod = (IMethod?)instr.Operand;
+					if (targetMethod is null) continue;
 					if (inlineCandidate.TryGetValue(targetMethod.ResolveMethodDef()?.FullName ?? targetMethod.FullName, out var methodToInline)) {
 						instr.Operand = methodToInline.Body.Instructions[methodToInline.Parameters.Count].Operand;
 						rewritten = true;
